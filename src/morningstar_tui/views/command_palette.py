@@ -1,4 +1,4 @@
-"""v0.7 keyboard command palette and searchable operator actions."""
+"""v0.9 keyboard command palette and searchable operator workspaces."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ class PaletteCommand:
     action: str
     label: str
     keys: str
+    group: str
     keywords: str = ""
 
 
@@ -29,20 +30,24 @@ class CommandChosen(Message):
 
 
 COMMANDS = (
-    PaletteCommand("show_overview", "Open site overview", "1", "site telemetry status"),
-    PaletteCommand("show_controllers", "Open controller inventory", "2", "hardware devices"),
-    PaletteCommand("show_power", "Open power flow", "3", "energy ledger topology"),
-    PaletteCommand("show_incidents", "Open incidents", "4", "alerts evidence"),
-    PaletteCommand("show_forecast", "Open forecast", "5", "prediction solar float"),
-    PaletteCommand("show_history", "Open history", "6", "chart telemetry"),
-    PaletteCommand("show_events", "Open events", "7", "timeline"),
-    PaletteCommand("show_investigation", "Open investigation", "8", "time cursor forensic"),
-    PaletteCommand("show_noc", "Open multi-site NOC", "9", "network operations"),
-    PaletteCommand("show_controller_detail", "Open selected controller operations", "D", "coverage gaps energy"),
-    PaletteCommand("show_fleet", "Open fleet comparison", "F", "90 day long term analytics"),
-    PaletteCommand("refresh_site", "Refresh selected site", "R", "reload"),
-    PaletteCommand("refresh_fleet", "Refresh fleet analytics", "Shift+R", "reload all controllers"),
-    PaletteCommand("investigate_now", "Investigate current time", "T", "forensic cursor"),
+    PaletteCommand("show_overview", "Open command-center overview", "1", "SYSTEM", "site telemetry status"),
+    PaletteCommand("show_system", "Open full system/site details", "S", "SYSTEM", "metric catalog energy health baselines"),
+    PaletteCommand("show_power", "Open power and energy flow", "3", "SYSTEM", "energy ledger currents residuals"),
+    PaletteCommand("show_forecast", "Open forecast", "5", "INTELLIGENCE", "prediction solar float"),
+    PaletteCommand("show_incidents", "Open incidents", "4", "INTELLIGENCE", "alerts evidence health"),
+    PaletteCommand("show_controllers", "Open controller inventory", "2", "CONTROLLER", "hardware devices"),
+    PaletteCommand("show_telemetry", "Open full live telemetry", "V", "CONTROLLER", "values registers normalized live"),
+    PaletteCommand("show_controller_detail", "Open data integrity / energy", "D", "CONTROLLER", "coverage gaps reconciliation"),
+    PaletteCommand("show_diagnostics", "Open controller diagnostics", "X", "CONTROLLER", "polling charge cycle health samples"),
+    PaletteCommand("show_history", "Open history", "6", "HISTORY", "chart telemetry"),
+    PaletteCommand("show_events", "Open events", "7", "HISTORY", "timeline"),
+    PaletteCommand("show_investigation", "Open investigation", "8", "HISTORY", "time cursor forensic"),
+    PaletteCommand("show_topology", "Open topology / components", "G", "SITE", "graph relationships components readyedge"),
+    PaletteCommand("show_noc", "Open multi-site NOC", "9", "FLEET", "network operations"),
+    PaletteCommand("show_fleet", "Open fleet comparison", "F", "FLEET", "90 day long term analytics"),
+    PaletteCommand("refresh_site", "Refresh selected site", "R", "ACTION", "reload"),
+    PaletteCommand("refresh_fleet", "Refresh fleet analytics", "Shift+R", "ACTION", "reload all controllers"),
+    PaletteCommand("investigate_now", "Investigate current time", "T", "ACTION", "forensic cursor"),
 )
 
 
@@ -54,14 +59,14 @@ class CommandPaletteView(DashboardView):
     def compose(self) -> ComposeResult:
         yield Static("COMMAND PALETTE", classes="view-title")
         yield Static(
-            "Type to filter commands. Enter runs the highlighted command; Esc returns.",
+            "Workspaces are grouped by system, controller, history, site and fleet. Type to filter; Enter runs the highlighted command.",
             classes="hint",
         )
-        yield Input(placeholder="Search commands…", id="command-query")
+        yield Input(placeholder="Search commands, data or workspace…", id="command-query")
         yield DataTable(id="command-table", zebra_stripes=True, cursor_type="row")
 
     def on_mount(self) -> None:
-        self.query_one("#command-table", DataTable).add_columns("Command", "Keys")
+        self.query_one("#command-table", DataTable).add_columns("Group", "Command", "Keys")
         self.refresh_commands("")
 
     def on_input_changed(self, event: Input.Changed) -> None:
@@ -84,14 +89,14 @@ class CommandPaletteView(DashboardView):
         words = [part.lower() for part in query.split() if part.strip()]
         matches = []
         for command in COMMANDS:
-            haystack = f"{command.label} {command.action} {command.keywords}".lower()
+            haystack = f"{command.group} {command.label} {command.action} {command.keywords}".lower()
             if all(word in haystack for word in words):
                 matches.append(command)
         self._matches = matches
         table = self.query_one("#command-table", DataTable)
         table.clear(columns=False)
         for command in matches:
-            table.add_row(command.label, command.keys)
+            table.add_row(command.group, command.label, command.keys)
 
     def selected_action(self) -> str | None:
         table = self.query_one("#command-table", DataTable)
