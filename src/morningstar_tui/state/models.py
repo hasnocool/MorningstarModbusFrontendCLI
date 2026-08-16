@@ -18,8 +18,22 @@ class InvestigationBundle:
 
 
 @dataclass(slots=True)
+class SiteDetailsBundle:
+    """Lazily hydrated system metadata that is too rich for every refresh cycle."""
+
+    metrics_catalog: object = field(default_factory=dict)
+    component_graph: dict[str, Any] = field(default_factory=dict)
+    components: object = field(default_factory=list)
+    relationships: object = field(default_factory=list)
+    energy: dict[str, Any] = field(default_factory=dict)
+    topology: dict[str, Any] = field(default_factory=dict)
+    loaded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    error: str | None = None
+
+
+@dataclass(slots=True)
 class ControllerIntegrityBundle:
-    """Cached controller-scoped evidence used by v0.6-v0.8 views."""
+    """Cached controller-scoped evidence used by controller and fleet workspaces."""
 
     controller_uid: str
     detail: dict[str, Any] = field(default_factory=dict)
@@ -33,6 +47,11 @@ class ControllerIntegrityBundle:
     energy_daily_30d: object = field(default_factory=dict)
     energy_summary_30d: dict[str, Any] = field(default_factory=dict)
     energy_summary_90d: dict[str, Any] = field(default_factory=dict)
+    history_summary: dict[str, Any] = field(default_factory=dict)
+    polling_performance: dict[str, Any] = field(default_factory=dict)
+    polling_history: object = field(default_factory=dict)
+    incidents: list[dict[str, Any]] = field(default_factory=list)
+    samples: object = field(default_factory=dict)
     loaded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     error: str | None = None
 
@@ -63,6 +82,7 @@ class SiteState:
     history_metric: str = "solar_input_power_w"
     history_window: str = "24h"
     investigation: InvestigationBundle | None = None
+    site_details: SiteDetailsBundle = field(default_factory=SiteDetailsBundle)
     selected_controller_uid: str | None = None
     controller_integrity: dict[str, ControllerIntegrityBundle] = field(default_factory=dict)
 
