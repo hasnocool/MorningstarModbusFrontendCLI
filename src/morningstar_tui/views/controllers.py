@@ -1,4 +1,4 @@
-"""Controller inventory with v0.6 integrity summaries and drill-down selection."""
+"""Expanded controller inventory with integrity summaries and workspace selection."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from textual.widgets import DataTable, Static
 
 from morningstar_tui.state.models import SiteState
 from morningstar_tui.util.analytics import coverage_percent, energy_difference_percent
-from morningstar_tui.util.formatting import fmt_percent, text
+from morningstar_tui.util.formatting import fmt_age, fmt_percent, text
 from morningstar_tui.views.base import DashboardView
 
 
@@ -28,7 +28,7 @@ class ControllersView(DashboardView):
     def compose(self) -> ComposeResult:
         yield Static("CONTROLLERS", classes="view-title")
         yield Static(
-            "Enter drills into the highlighted physical controller. Integrity columns are loaded lazily from API v0.6 evidence endpoints.",
+            "Enter opens full live telemetry. D = data integrity/energy, X = diagnostics. Integrity columns hydrate asynchronously.",
             classes="hint",
         )
         yield DataTable(id="controllers-table", zebra_stripes=True, cursor_type="row")
@@ -38,9 +38,12 @@ class ControllersView(DashboardView):
             "Controller UID",
             "Status",
             "Model",
+            "Serial",
+            "Firmware",
             "Transport",
             "Endpoint",
             "Identity",
+            "Last seen",
             "Data",
             "Energy Δ",
         )
@@ -70,19 +73,29 @@ class ControllersView(DashboardView):
                 continue
             self._row_uids.append(controller_uid)
             integrity = state.controller_integrity.get(controller_uid)
+            detail = integrity.detail if integrity else {}
             data_quality = fmt_percent(coverage_percent(integrity.coverage)) if integrity else "…"
             energy_delta = (
                 fmt_percent(energy_difference_percent(integrity.energy_summary_30d))
                 if integrity
                 else "…"
             )
+            last_seen = (
+                item.get("last_seen")
+                or item.get("observed_at")
+                or detail.get("last_seen")
+                or detail.get("observed_at")
+            )
             table.add_row(
                 controller_uid,
                 text(item.get("status") or item.get("state") or item.get("online")),
-                text(item.get("model") or item.get("model_name") or item.get("product")),
-                text(item.get("transport") or item.get("transport_type")),
-                text(item.get("endpoint") or item.get("device") or item.get("host") or item.get("port")),
-                text(item.get("identity_confidence") or item.get("confidence") or item.get("serial_number")),
+                text(item.get("model") or item.get("model_name") or item.get("product") or detail.get("model")),
+                text(item.get("serial_number") or item.get("serial") or detail.get("serial_number") or detail.get("serial")),
+                text(item.get("firmware") or item.get("firmware_version") or detail.get("firmware") or detail.get("firmware_version")),
+                text(item.get("transport") or item.get("transport_type") or detail.get("transport")),
+                text(item.get("endpoint") or item.get("device") or item.get("host") or item.get("port") or detail.get("endpoint")),
+                text(item.get("identity_confidence") or item.get("confidence") or detail.get("identity_confidence")),
+                fmt_age(last_seen) if last_seen else "—",
                 data_quality,
                 energy_delta,
             )
