@@ -192,6 +192,7 @@ class MorningstarTUI(App[None]):
             "CONTROLLER  [2] Inventory [V] Telemetry [D] Data [X] Diagnostics  |  "
             "HISTORY  [6] History [7] Events [8] Investigate  |  SITE/FLEET [G] Topology [9] NOC [F] Fleet",
             id="navigation-bar",
+            markup=False,
         )
         with ContentSwitcher(initial="overview", id="views"):
             yield OverviewView(id="overview")
