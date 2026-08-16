@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "morningstar-modbus-tui"
-version = "0.5.0"
+version = "0.8.0"
 description = "Async terminal operations dashboard for MorningstarModbusAPI"
 readme = "README.md"
 requires-python = ">=3.12"
