@@ -19,9 +19,9 @@ def scalar_rows(payload: object, *, max_rows: int = 400) -> list[tuple[str, str,
             return
         if isinstance(value, Mapping):
             if "value" in value and not isinstance(value.get("value"), (Mapping, list)):
-                unit = _text(value.get("unit"))
-                quality = _text(value.get("quality") or value.get("status"))
-                source = _text(value.get("source") or value.get("provenance"))
+                unit = _optional_text(value.get("unit"))
+                quality = _optional_text(value.get("quality") or value.get("status"))
+                source = _optional_text(value.get("source") or value.get("provenance"))
                 suffix = quality if not source else f"{quality} · {source}" if quality else source
                 output.append((path or "value", _text(value.get("value")), unit, suffix))
                 for key, child in value.items():
@@ -68,6 +68,12 @@ def compact_mapping(payload: object, *, limit: int = 40) -> str:
             rendered = f"{rendered} [{quality}]"
         lines.append(f"{path:36} {rendered}")
     return "\n".join(lines) if lines else "No data returned by API."
+
+
+def _optional_text(value: object | None) -> str:
+    if value is None:
+        return ""
+    return _text(value)
 
 
 def _text(value: object | None) -> str:
