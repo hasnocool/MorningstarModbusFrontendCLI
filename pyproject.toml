@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "morningstar-modbus-tui"
+version = "0.5.0"
+description = "Async terminal operations dashboard for MorningstarModbusAPI"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "hasnocool" }]
+dependencies = [
+  "httpx>=0.28.1,<1.0",
+  "textual>=8.2.8,<9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9.1.1,<10",
+  "pytest-asyncio>=1.4.0,<2",
+  "ruff>=0.16.0,<0.17",
+]
+
+[project.scripts]
+morningstar-tui = "morningstar_tui.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/morningstar_tui"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "UP", "B"]
+ignore = ["E501"]
