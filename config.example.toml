@@ -1,0 +1,24 @@
+[dashboard]
+refresh_interval_seconds = 15.0
+reconnect_initial_seconds = 1.0
+reconnect_max_seconds = 30.0
+request_timeout_seconds = 10.0
+history_window = "24h"
+history_metric = "solar_input_power_w"
+compact = false
+low_bandwidth = false
+alert_only = false
+
+[[sites]]
+name = "local"
+base_url = "http://127.0.0.1:8080"
+system = "sys_default"
+verify_tls = true
+# token = "optional-bearer-token"
+
+# Add more MorningstarModbusAPI servers for v0.5 NOC mode.
+# [[sites]]
+# name = "remote-cabin"
+# base_url = "https://solar.example.net"
+# system = "sys_default"
+# verify_tls = true
