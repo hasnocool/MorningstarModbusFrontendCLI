@@ -24,6 +24,7 @@ def test_scalar_rows_flattens_nested_lists_and_scalars() -> None:
     payload = {
         "faults": ["overcurrent", "overtemp"],
         "status": {"online": True, "attempts": 3},
+        "power": {"value": 0, "unit": "W", "quality": "complete"},
     }
 
     rows = scalar_rows(payload)
@@ -32,6 +33,7 @@ def test_scalar_rows_flattens_nested_lists_and_scalars() -> None:
     assert ("faults[1]", "overtemp", "", "") in rows
     assert ("status.online", "yes", "", "") in rows
     assert ("status.attempts", "3", "", "") in rows
+    assert ("power", "0", "W", "complete") in rows
 
 
 def test_record_rows_supports_common_envelopes() -> None:
