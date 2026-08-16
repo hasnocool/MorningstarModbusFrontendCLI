@@ -18,6 +18,26 @@ class InvestigationBundle:
 
 
 @dataclass(slots=True)
+class ControllerIntegrityBundle:
+    """Cached controller-scoped evidence used by v0.6-v0.8 views."""
+
+    controller_uid: str
+    detail: dict[str, Any] = field(default_factory=dict)
+    latest: dict[str, Any] = field(default_factory=dict)
+    health_score: dict[str, Any] = field(default_factory=dict)
+    charge_cycle: dict[str, Any] = field(default_factory=dict)
+    charge_forecast: dict[str, Any] = field(default_factory=dict)
+    coverage: dict[str, Any] = field(default_factory=dict)
+    gaps: object = field(default_factory=dict)
+    retained_summary: dict[str, Any] = field(default_factory=dict)
+    energy_daily_30d: object = field(default_factory=dict)
+    energy_summary_30d: dict[str, Any] = field(default_factory=dict)
+    energy_summary_90d: dict[str, Any] = field(default_factory=dict)
+    loaded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    error: str | None = None
+
+
+@dataclass(slots=True)
 class SiteState:
     name: str
     base_url: str
@@ -43,6 +63,8 @@ class SiteState:
     history_metric: str = "solar_input_power_w"
     history_window: str = "24h"
     investigation: InvestigationBundle | None = None
+    selected_controller_uid: str | None = None
+    controller_integrity: dict[str, ControllerIntegrityBundle] = field(default_factory=dict)
 
     def touch(self) -> None:
         self.last_update = datetime.now(UTC)
