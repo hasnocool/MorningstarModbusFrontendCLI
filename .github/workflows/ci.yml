@@ -23,4 +23,21 @@ jobs:
       - run: python -m pip install -e '.[dev]'
       - run: ruff check . --output-format=github
       - run: python -m compileall -q src tests
-      - run: pytest -s
+      - name: Run pytest
+        shell: bash
+        run: |
+          set +e
+          output="$(mktemp)"
+          pytest -q -s 2>&1 | tee "$output"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            python - "$output" <<'PY'
+          from pathlib import Path
+          import sys
+
+          text = Path(sys.argv[1]).read_text(errors="replace")[-12000:]
+          escaped = text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          print(f"::error title=pytest failure::{escaped}")
+          PY
+          fi
+          exit "$status"
