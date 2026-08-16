@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterable, AsyncIterator
 from dataclasses import dataclass
 import json
-from typing import AsyncIterable, AsyncIterator
 
 
 @dataclass(frozen=True, slots=True)

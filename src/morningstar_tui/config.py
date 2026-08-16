@@ -17,7 +17,7 @@ class SiteConfig:
     token: str | None = None
     verify_tls: bool = True
 
-    def normalized(self) -> "SiteConfig":
+    def normalized(self) -> SiteConfig:
         return replace(self, base_url=self.base_url.rstrip("/"))
 
 

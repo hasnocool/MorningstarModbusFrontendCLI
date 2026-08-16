@@ -7,14 +7,13 @@ from collections.abc import Awaitable
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 import json
-from typing import Any, TypeVar
+from typing import Any
 
 from morningstar_tui.api import APIError, MorningstarAPIClient, SSEEvent
 from morningstar_tui.config import AppConfig, SiteConfig
 from morningstar_tui.state.models import InvestigationBundle, SiteState
 from morningstar_tui.state.store import StateStore
 
-T = TypeVar("T")
 
 _WINDOW_DELTAS = {
     "1h": timedelta(hours=1),
@@ -252,7 +251,7 @@ class DashboardRuntime:
                 await self.store.patch(name, incidents=incidents)
 
 
-async def _safe(awaitable: Awaitable[T], default: T) -> T:
+async def _safe[T](awaitable: Awaitable[T], default: T) -> T:
     try:
         return await awaitable
     except Exception:
