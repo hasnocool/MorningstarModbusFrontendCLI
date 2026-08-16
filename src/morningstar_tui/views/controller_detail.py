@@ -1,4 +1,4 @@
-"""v0.6 controller drill-down, data-integrity and energy reconciliation console."""
+"""Controller data-integrity and energy-reconciliation workspace."""
 
 from __future__ import annotations
 
@@ -34,12 +34,12 @@ from morningstar_tui.views.base import DashboardView
 
 class ControllerDetailView(DashboardView):
     def compose(self) -> ComposeResult:
-        yield Static("CONTROLLER OPERATIONS", classes="view-title")
+        yield Static("DATA INTEGRITY / ENERGY", classes="view-title")
         yield Static(
-            "v0.6: live identity + evidence coverage + recovered gaps + controller-vs-local energy. Esc returns to the previous view.",
+            "Evidence coverage, recovered gaps and controller-vs-local energy. V = live telemetry, X = diagnostics, Esc = back.",
             classes="hint",
         )
-        yield Static("Select a controller from view 2 and press Enter.", id="controller-summary", classes="panel")
+        yield Static("Select a controller from view 2 first.", id="controller-summary", classes="panel")
         yield Static("", id="coverage-calendar", classes="panel")
         yield Static("HISTORY GAPS", classes="view-title")
         yield DataTable(id="controller-gaps-table", zebra_stripes=True, cursor_type="row")
