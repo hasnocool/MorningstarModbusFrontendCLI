@@ -1,17 +1,23 @@
-"""Concurrent multi-site runtime for REST, SSE and on-demand controller analytics."""
+"""Concurrent multi-site runtime for REST, SSE and on-demand analytics."""
 
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable
 from contextlib import suppress
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 import json
 from typing import Any
 
 from morningstar_tui.api import APIError, MorningstarAPIClient, SSEEvent
 from morningstar_tui.config import AppConfig, SiteConfig
-from morningstar_tui.state.models import ControllerIntegrityBundle, InvestigationBundle, SiteState
+from morningstar_tui.state.models import (
+    ControllerIntegrityBundle,
+    InvestigationBundle,
+    SiteDetailsBundle,
+    SiteState,
+)
 from morningstar_tui.state.store import StateStore
 
 
@@ -34,6 +40,7 @@ _WINDOW_RESOLUTION = {
     "1y": "1d",
 }
 _CONTROLLER_CACHE_SECONDS = 45.0
+_SITE_CACHE_SECONDS = 60.0
 
 
 class DashboardRuntime:
@@ -63,6 +70,7 @@ class DashboardRuntime:
         )
         self._stop = asyncio.Event()
         self._controller_slots = asyncio.Semaphore(6)
+        self._site_slots = asyncio.Semaphore(4)
 
     async def close(self) -> None:
         self._stop.set()
@@ -121,6 +129,47 @@ class DashboardRuntime:
             await self.store.patch(name, **changes)
         except Exception as exc:
             await self.store.patch(name, online=False, stream_online=False, last_error=str(exc))
+
+    async def fetch_site_details(self, name: str, *, force: bool = False) -> SiteDetailsBundle:
+        """Load slower system metadata only when a detailed workspace needs it."""
+
+        state = await self.store.snapshot(name)
+        cached = state.site_details
+        if not force and cached.loaded_at:
+            age = (datetime.now(UTC) - cached.loaded_at).total_seconds()
+            has_data = bool(
+                cached.metrics_catalog
+                or cached.component_graph
+                or cached.components
+                or cached.relationships
+                or cached.energy
+                or cached.topology
+            )
+            if has_data and age <= _SITE_CACHE_SECONDS:
+                return cached
+        client = self.clients[name]
+        async with self._site_slots:
+            try:
+                metrics_catalog, graph, components, relationships, energy, topology = await asyncio.gather(
+                    _safe(client.system_metrics_catalog(), {}),
+                    _safe(client.component_graph(state.system_uid), {}),
+                    _safe(client.components(state.system_uid), []),
+                    _safe(client.relationships(state.system_uid), []),
+                    _safe(client.system_energy(state.system_uid), {}),
+                    _safe(client.topology(state.system_uid), {}),
+                )
+                bundle = SiteDetailsBundle(
+                    metrics_catalog=metrics_catalog,
+                    component_graph=graph,
+                    components=components,
+                    relationships=relationships,
+                    energy=energy,
+                    topology=topology,
+                )
+            except Exception as exc:
+                bundle = SiteDetailsBundle(error=str(exc))
+        await self.store.site_details(name, bundle)
+        return bundle
 
     async def fetch_history(self, name: str, metric: str, window: str) -> None:
         state = await self.store.snapshot(name)
@@ -201,7 +250,7 @@ class DashboardRuntime:
         force: bool = False,
         select: bool = True,
     ) -> ControllerIntegrityBundle:
-        """Load v0.6 controller evidence lazily and cache it for rapid TUI navigation."""
+        """Load controller evidence lazily and cache it for rapid TUI navigation."""
 
         if select:
             await self.store.select_controller(name, controller_uid)
@@ -264,6 +313,52 @@ class DashboardRuntime:
 
         await self.store.controller_integrity(name, controller_uid, bundle)
         return bundle
+
+    async def fetch_controller_diagnostics(
+        self,
+        name: str,
+        controller_uid: str,
+        *,
+        force: bool = False,
+        select: bool = True,
+    ) -> ControllerIntegrityBundle:
+        """Enrich one selected controller with expensive diagnostics only on demand."""
+
+        bundle = await self.fetch_controller_integrity(
+            name,
+            controller_uid,
+            force=force,
+            select=select,
+        )
+        diagnostics_present = bool(
+            bundle.history_summary
+            or bundle.polling_performance
+            or bundle.polling_history
+            or bundle.incidents
+            or bundle.samples
+        )
+        if diagnostics_present and not force:
+            return bundle
+        client = self.clients[name]
+        async with self._controller_slots:
+            history_summary, performance, polling_history, incidents, samples = await asyncio.gather(
+                _safe(client.controller_history_summary(controller_uid), {}),
+                _safe(client.controller_polling_performance(controller_uid), {}),
+                _safe(client.controller_polling_history(controller_uid, limit=100), {}),
+                _safe(client.controller_incidents(controller_uid, state=None, limit=200), []),
+                _safe(client.controller_samples(controller_uid, limit=100), {}),
+            )
+        enriched = replace(
+            bundle,
+            history_summary=history_summary,
+            polling_performance=performance,
+            polling_history=polling_history,
+            incidents=incidents,
+            samples=samples,
+            loaded_at=datetime.now(UTC),
+        )
+        await self.store.controller_integrity(name, controller_uid, enriched)
+        return enriched
 
     async def hydrate_site_integrity(self, name: str, *, force: bool = False) -> None:
         """Enrich every controller for fleet comparison using bounded async requests."""
