@@ -7,7 +7,12 @@ from collections.abc import Callable
 from copy import deepcopy
 from typing import Any
 
-from morningstar_tui.state.models import ControllerIntegrityBundle, InvestigationBundle, SiteState
+from morningstar_tui.state.models import (
+    ControllerIntegrityBundle,
+    InvestigationBundle,
+    SiteDetailsBundle,
+    SiteState,
+)
 
 StateCallback = Callable[[str], None]
 
@@ -59,6 +64,9 @@ class StateStore:
 
     async def investigation(self, name: str, bundle: InvestigationBundle) -> None:
         await self.patch(name, investigation=bundle)
+
+    async def site_details(self, name: str, bundle: SiteDetailsBundle) -> None:
+        await self.patch(name, site_details=bundle)
 
     async def select_controller(self, name: str, controller_uid: str | None) -> None:
         await self.patch(name, selected_controller_uid=controller_uid)
