@@ -74,3 +74,18 @@
 - 30-day and 90-day controller energy comparison.
 - Fleet-wide energy discrepancy visibility.
 - Bounded concurrent fleet hydration so large site lists do not stampede APIs.
+
+## v0.9 — Expanded TUI Information Architecture
+
+- Reorganize the terminal into persistent SYSTEM, CONTROLLER, HISTORY and SITE/FLEET workspaces.
+- Add a navigation strip while preserving the existing `1`–`9` dashboard shortcuts.
+- Add a System / Site Details workspace with normalized metric catalog, system energy, health-score detail and baselines.
+- Add a full live telemetry explorer for normalized system telemetry and the selected physical controller.
+- Add a Topology / Component Graph workspace for components, typed relationships, confidence and source evidence.
+- Add a Controller Diagnostics workspace for health evidence, charge-cycle detail, charge forecast, polling performance/history, history summary, incidents and recent samples.
+- Expand the main Overview with system charge/battery/load currents and powers, temperatures, alarms, faults and health context.
+- Expand Power / Energy with whole-system current and power residuals, source-aware Ah/Wh counters and power-flow provenance.
+- Expand controller inventory with serial, firmware and last-seen metadata.
+- Add generic defensive payload exploration so newly added API fields remain visible without hard-coding every register into the frontend.
+- Keep slow system metadata and controller diagnostics out of the periodic refresh loop using short-lived lazy caches.
+- Bound detailed site/controller hydration with `asyncio.Semaphore` and retain `asyncio.Lock`-protected state updates.
