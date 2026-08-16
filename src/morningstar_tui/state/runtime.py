@@ -1,4 +1,4 @@
-"""Concurrent multi-site runtime for REST snapshots, SSE, history and investigation."""
+"""Concurrent multi-site runtime for REST, SSE and on-demand controller analytics."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import Any
 
 from morningstar_tui.api import APIError, MorningstarAPIClient, SSEEvent
 from morningstar_tui.config import AppConfig, SiteConfig
-from morningstar_tui.state.models import InvestigationBundle, SiteState
+from morningstar_tui.state.models import ControllerIntegrityBundle, InvestigationBundle, SiteState
 from morningstar_tui.state.store import StateStore
 
 
@@ -33,6 +33,7 @@ _WINDOW_RESOLUTION = {
     "180d": "1d",
     "1y": "1d",
 }
+_CONTROLLER_CACHE_SECONDS = 45.0
 
 
 class DashboardRuntime:
@@ -61,6 +62,7 @@ class DashboardRuntime:
             ]
         )
         self._stop = asyncio.Event()
+        self._controller_slots = asyncio.Semaphore(6)
 
     async def close(self) -> None:
         self._stop.set()
@@ -187,6 +189,109 @@ class DashboardRuntime:
         except Exception as exc:
             bundle = InvestigationBundle(cursor=cursor, start=start, end=end, error=str(exc))
         await self.store.investigation(name, bundle)
+
+    async def select_controller(self, name: str, controller_uid: str) -> None:
+        await self.store.select_controller(name, controller_uid)
+
+    async def fetch_controller_integrity(
+        self,
+        name: str,
+        controller_uid: str,
+        *,
+        force: bool = False,
+        select: bool = True,
+    ) -> ControllerIntegrityBundle:
+        """Load v0.6 controller evidence lazily and cache it for rapid TUI navigation."""
+
+        if select:
+            await self.store.select_controller(name, controller_uid)
+        state = await self.store.snapshot(name)
+        cached = state.controller_integrity.get(controller_uid)
+        if cached is not None and not force:
+            age = (datetime.now(UTC) - cached.loaded_at).total_seconds()
+            if age <= _CONTROLLER_CACHE_SECONDS:
+                return cached
+
+        client = self.clients[name]
+        end_day = datetime.now(UTC).date()
+        start_30d = (end_day - timedelta(days=30)).isoformat()
+        start_90d = (end_day - timedelta(days=90)).isoformat()
+        end = (end_day + timedelta(days=1)).isoformat()
+
+        async with self._controller_slots:
+            try:
+                (
+                    detail,
+                    latest,
+                    health_score,
+                    charge_cycle,
+                    charge_forecast,
+                    coverage,
+                    gaps,
+                    retained_summary,
+                    energy_daily_30d,
+                    energy_summary_30d,
+                    energy_summary_90d,
+                ) = await asyncio.gather(
+                    _safe(client.controller(controller_uid), {}),
+                    _safe(client.controller_latest(controller_uid), {}),
+                    _safe(client.controller_health_score(controller_uid), {}),
+                    _safe(client.controller_charge_cycle(controller_uid), {}),
+                    _safe(client.controller_charge_forecast(controller_uid), {}),
+                    _safe(client.controller_coverage(controller_uid, start=start_90d, end=end), {}),
+                    _safe(client.controller_gaps(controller_uid, start=start_90d, end=end), {}),
+                    _safe(client.controller_retained_summary(controller_uid, start=start_90d, end=end), {}),
+                    _safe(client.controller_energy_daily(controller_uid, start=start_30d, end=end), {}),
+                    _safe(client.controller_energy_summary(controller_uid, start=start_30d, end=end), {}),
+                    _safe(client.controller_energy_summary(controller_uid, start=start_90d, end=end), {}),
+                )
+                bundle = ControllerIntegrityBundle(
+                    controller_uid=controller_uid,
+                    detail=detail,
+                    latest=latest,
+                    health_score=health_score,
+                    charge_cycle=charge_cycle,
+                    charge_forecast=charge_forecast,
+                    coverage=coverage,
+                    gaps=gaps,
+                    retained_summary=retained_summary,
+                    energy_daily_30d=energy_daily_30d,
+                    energy_summary_30d=energy_summary_30d,
+                    energy_summary_90d=energy_summary_90d,
+                )
+            except Exception as exc:
+                bundle = ControllerIntegrityBundle(controller_uid=controller_uid, error=str(exc))
+
+        await self.store.controller_integrity(name, controller_uid, bundle)
+        return bundle
+
+    async def hydrate_site_integrity(self, name: str, *, force: bool = False) -> None:
+        """Enrich every controller for fleet comparison using bounded async requests."""
+
+        state = await self.store.snapshot(name)
+        controller_uids = [
+            str(item.get("controller_uid") or "")
+            for item in state.controllers
+            if item.get("controller_uid")
+        ]
+        await asyncio.gather(
+            *(
+                self.fetch_controller_integrity(
+                    name,
+                    controller_uid,
+                    force=force,
+                    select=False,
+                )
+                for controller_uid in controller_uids
+            ),
+            return_exceptions=True,
+        )
+
+    async def hydrate_fleet_integrity(self, *, force: bool = False) -> None:
+        await asyncio.gather(
+            *(self.hydrate_site_integrity(site.name, force=force) for site in self.config.sites),
+            return_exceptions=True,
+        )
 
     async def snapshot_once(self) -> list[SiteState]:
         await asyncio.gather(*(self.refresh_site(site.name) for site in self.config.sites))
