@@ -220,6 +220,11 @@ class MorningstarTUI(App[None]):
             self.query_one("#views", ContentSwitcher).current = "noc"
         self.runtime.store.set_callback(self._state_changed)
         self._runtime_task = asyncio.create_task(self.runtime.run(), name="morningstar-runtime")
+        self.call_after_refresh(self._start_state_flush_timer)
+
+    def _start_state_flush_timer(self) -> None:
+        """Start periodic rendering only after the first complete Textual composition pass."""
+
         self.set_interval(0.35, self._flush_state)
 
     async def on_unmount(self) -> None:
