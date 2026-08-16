@@ -13,6 +13,13 @@ from morningstar_tui.views.base import DashboardView
 from morningstar_tui.widgets import MetricCard
 
 
+def _first_value(*values: object | None) -> object | None:
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
 class PowerFlowView(DashboardView):
     def compose(self) -> ComposeResult:
         yield Static("POWER / ENERGY", classes="view-title")
@@ -33,28 +40,33 @@ class PowerFlowView(DashboardView):
     def refresh_state(self, state: SiteState, all_states: list[SiteState]) -> None:
         del all_states
         source = state.power_flow or state.latest
-        solar = metric(source, "solar_input_power_w") or metric(state.latest, "solar_input_power_w")
-        controller_charge = metric(source, "charge_output_power_w") or metric(
-            state.latest, "charge_output_power_w"
+        solar = _first_value(
+            metric(source, "solar_input_power_w"), metric(state.latest, "solar_input_power_w")
         )
-        system_charge = metric(source, "system_charge_power_w") or controller_charge
+        controller_charge = _first_value(
+            metric(source, "charge_output_power_w"), metric(state.latest, "charge_output_power_w")
+        )
+        system_charge = _first_value(metric(source, "system_charge_power_w"), controller_charge)
         battery = metric(source, "battery_net_power_w")
-        load = metric(source, "dc_load_power_w") or metric(source, "load_power_w")
-        system_current = metric(source, "system_charge_current_a") or metric(
-            state.latest, "system_charge_current_a"
+        load = _first_value(metric(source, "dc_load_power_w"), metric(source, "load_power_w"))
+        system_current = _first_value(
+            metric(source, "system_charge_current_a"), metric(state.latest, "system_charge_current_a")
         )
-        battery_current = metric(source, "battery_net_current_a") or metric(
-            state.latest, "battery_net_current_a"
+        battery_current = _first_value(
+            metric(source, "battery_net_current_a"), metric(state.latest, "battery_net_current_a")
         )
-        load_current = metric(source, "system_load_current_a") or metric(
-            state.latest, "system_load_current_a"
+        load_current = _first_value(
+            metric(source, "system_load_current_a"), metric(state.latest, "system_load_current_a")
         )
-        residual = metric(source, "dc_power_residual_w") or metric(
-            source, "whole_system_dc_power_residual_w"
-        ) or metric(source, "power_residual_w")
+        residual = _first_value(
+            metric(source, "dc_power_residual_w"),
+            metric(source, "whole_system_dc_power_residual_w"),
+            metric(source, "power_residual_w"),
+        )
         self.query_one("#pf-solar", MetricCard).set_metric("PV input", fmt_number(solar, "W", 0))
         self.query_one("#pf-charge", MetricCard).set_metric(
-            "System charge", fmt_number(system_charge, "W", 0),
+            "System charge",
+            fmt_number(system_charge, "W", 0),
             f"controller output {fmt_number(controller_charge, 'W', 0)}",
         )
         self.query_one("#pf-battery", MetricCard).set_metric("Battery net", fmt_number(battery, "W", 0))
