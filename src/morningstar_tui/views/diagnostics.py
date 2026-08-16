@@ -5,7 +5,7 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.widgets import DataTable, Static
 
-from morningstar_tui.state.models import ControllerIntegrityBundle, SiteState
+from morningstar_tui.state.models import SiteState
 from morningstar_tui.util.explorer import scalar_rows
 from morningstar_tui.util.formatting import fmt_age
 from morningstar_tui.views.base import DashboardView
