@@ -30,9 +30,15 @@ class ForecastView(DashboardView):
     def refresh_state(self, state: SiteState, all_states: list[SiteState]) -> None:
         del all_states
         forecast = state.forecast
-        observed = first(forecast, "solar.observed_energy_wh", "solar.observed_so_far_wh")
+        observed = first(
+            forecast,
+            "solar.energy.observed_input_wh",
+            "solar.observed_energy_wh",
+            "solar.observed_so_far_wh",
+        )
         p50 = first(
             forecast,
+            "solar.energy.eod_p50_wh",
             "solar.projected_end_of_day_wh.p50",
             "solar.projected_eod_wh.p50",
             "solar.projected_end_of_day_energy_wh.p50",
@@ -56,10 +62,10 @@ class ForecastView(DashboardView):
                 if not isinstance(point, Mapping):
                     continue
                 for target, key in (
-                    (observed_curve, "observed"),
-                    (p10_curve, "p10"),
-                    (p50_curve, "p50"),
-                    (p90_curve, "p90"),
+                    (observed_curve, "observed_w"),
+                    (p10_curve, "p10_w"),
+                    (p50_curve, "p50_w"),
+                    (p90_curve, "p90_w"),
                 ):
                     value = number(point.get(key))
                     if value is not None:
@@ -78,7 +84,7 @@ class ForecastView(DashboardView):
                 if not isinstance(item, Mapping):
                     continue
                 uid = text(item.get("controller_uid"))
-                stage = text(item.get("current_charge_state") or item.get("current_state"))
+                stage = text(item.get("current_state") or item.get("current_charge_state"))
                 chance = fmt_percent(item.get("float_probability"), ratio=True)
                 expected = text(item.get("expected_float_at") or item.get("median_first_float_time"))
                 lines.append(f"{uid:20} {stage:12} Float {chance:8} expected {expected}")
@@ -89,7 +95,7 @@ class ForecastView(DashboardView):
         self.query_one("#fc-accuracy", Static).update(
             "[b]Backtest calibration[/b]\n"
             f"evaluated days: {text(first(accuracy, 'evaluated_days', 'count'))}\n"
-            f"median P50 APE: {fmt_percent(first(accuracy, 'median_absolute_percentage_error', 'median_ape'))}\n"
-            f"mean P50 APE: {fmt_percent(first(accuracy, 'mean_absolute_percentage_error', 'mean_ape'))}\n"
-            f"P10-P90 coverage: {fmt_percent(first(accuracy, 'interval_coverage', 'p10_p90_coverage'), ratio=True)}"
+            f"median P50 APE: {fmt_percent(first(accuracy, 'median_absolute_error_percent', 'median_absolute_percentage_error', 'median_ape'))}\n"
+            f"mean P50 APE: {fmt_percent(first(accuracy, 'mean_absolute_error_percent', 'mean_absolute_percentage_error', 'mean_ape'))}\n"
+            f"P10-P90 coverage: {fmt_percent(first(accuracy, 'p10_p90_interval_coverage', 'interval_coverage', 'p10_p90_coverage'), ratio=True)}"
         )

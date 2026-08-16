@@ -50,12 +50,14 @@ class OverviewView(DashboardView):
         stage = metric(state.latest, "charge_state")
         observed_wh = first(
             state.forecast,
+            "solar.energy.observed_input_wh",
             "solar.observed_energy_wh",
             "solar.observed_so_far_wh",
             "observed_energy_wh",
         )
         projected = first(
             state.forecast,
+            "solar.energy.eod_p50_wh",
             "solar.projected_end_of_day_wh.p50",
             "solar.projected_eod_wh.p50",
             "solar.projected_end_of_day_energy_wh.p50",
