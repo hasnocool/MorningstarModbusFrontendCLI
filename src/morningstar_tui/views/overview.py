@@ -1,4 +1,4 @@
-"""v0.1/v0.2 site command-center overview."""
+"""v0.9 site command-center overview with expanded electrical state."""
 
 from __future__ import annotations
 
@@ -35,6 +35,8 @@ class OverviewView(DashboardView):
         with Vertical(classes="panel"):
             yield Static("[b]Connection[/b]", id="ov-connection")
             yield Static("[b]Forecast confidence[/b]", id="ov-confidence")
+        yield Static(id="ov-electrical", classes="panel")
+        yield Static(id="ov-health-detail", classes="panel")
         yield Static("[b]Controllers[/b]")
         yield DataTable(id="ov-controllers", zebra_stripes=True)
 
@@ -78,7 +80,11 @@ class OverviewView(DashboardView):
         self.query_one("#ov-float", MetricCard).set_metric(
             "Float chance", fmt_percent(float_probability, ratio=True)
         )
-        critical = sum(1 for item in state.incidents if str(item.get("severity", "")).lower() == "critical")
+        critical = sum(
+            1
+            for item in state.incidents
+            if str(item.get("severity", "")).lower() == "critical"
+        )
         self.query_one("#ov-incidents", MetricCard).set_metric(
             "Active incidents", str(len(state.incidents)), f"{critical} critical"
         )
@@ -92,11 +98,51 @@ class OverviewView(DashboardView):
         self.query_one("#ov-confidence", Static).update(
             f"[b]Forecast confidence[/b]  {text(confidence)}"
         )
+        self.query_one("#ov-electrical", Static).update(_electrical_summary(state))
+        self.query_one("#ov-health-detail", Static).update(_health_summary(state))
         table = self.query_one("#ov-controllers", DataTable)
         table.clear(columns=False)
         for controller in state.controllers:
             uid = text(controller.get("controller_uid") or controller.get("controller_id") or "unknown")
-            status_value = text(controller.get("status") or controller.get("state") or controller.get("online"))
+            status_value = text(
+                controller.get("status") or controller.get("state") or controller.get("online")
+            )
             model = text(controller.get("model") or controller.get("model_name") or controller.get("product"))
             last_seen = text(controller.get("last_seen") or controller.get("observed_at") or "—")
             table.add_row(uid, status_value, model, last_seen)
+
+
+def _electrical_summary(state: SiteState) -> str:
+    values = (
+        ("Controller charge power", "charge_output_power_w", "W", 0),
+        ("System charge power", "system_charge_power_w", "W", 0),
+        ("Battery net power", "battery_net_power_w", "W", 0),
+        ("DC load power", "dc_load_power_w", "W", 0),
+        ("Controller charge current", "battery_charge_current_a", "A", 1),
+        ("System charge current", "system_charge_current_a", "A", 1),
+        ("Battery net current", "battery_net_current_a", "A", 1),
+        ("System load current", "system_load_current_a", "A", 1),
+        ("Load voltage", "load_voltage_v", "V", 2),
+        ("Battery temperature", "battery_temperature_c", "°C", 1),
+    )
+    lines = ["[b]Live electrical state[/b]"]
+    for label, key, unit, digits in values:
+        value = metric(state.power_flow, key)
+        if value is None:
+            value = metric(state.latest, key)
+        lines.append(f"{label:28} {fmt_number(value, unit, digits)}")
+    return "\n".join(lines)
+
+
+def _health_summary(state: SiteState) -> str:
+    faults = metric(state.latest, "faults")
+    alarms = metric(state.latest, "alarms")
+    score = first(state.health_score, "score", "health_score", "total")
+    categories = first(state.health_score, "categories", "components", "breakdown")
+    return (
+        "[b]Health / state[/b]\n"
+        f"Health score                 {fmt_number(score, '/100', 0)}\n"
+        f"Faults                       {text(faults)}\n"
+        f"Alarms                       {text(alarms)}\n"
+        f"Health breakdown             {text(categories)}"
+    )

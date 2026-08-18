@@ -59,6 +59,9 @@ class MorningstarAPIClient:
         payload = await self.get_json("/v1/systems")
         return payload if isinstance(payload, list) else list(payload.get("systems", []))
 
+    async def system_metrics_catalog(self) -> JSON:
+        return await self.get_json("/v1/systems/metrics/catalog")
+
     async def system(self, system_uid: str) -> dict[str, Any]:
         return _object(await self.get_json(f"/v1/systems/{system_uid}"))
 
@@ -69,11 +72,23 @@ class MorningstarAPIClient:
     async def latest(self, system_uid: str) -> dict[str, Any]:
         return _object(await self.get_json(f"/v1/systems/{system_uid}/latest"))
 
+    async def component_graph(self, system_uid: str) -> dict[str, Any]:
+        return _object(await self.get_json(f"/v1/systems/{system_uid}/component-graph"))
+
+    async def components(self, system_uid: str) -> JSON:
+        return await self.get_json(f"/v1/systems/{system_uid}/components")
+
+    async def relationships(self, system_uid: str) -> JSON:
+        return await self.get_json(f"/v1/systems/{system_uid}/relationships")
+
     async def power_flow(self, system_uid: str) -> dict[str, Any]:
         return _object(await self.get_json(f"/v1/systems/{system_uid}/power-flow"))
 
     async def energy_ledger(self, system_uid: str) -> dict[str, Any]:
         return _object(await self.get_json(f"/v1/systems/{system_uid}/energy-ledger"))
+
+    async def system_energy(self, system_uid: str) -> dict[str, Any]:
+        return _object(await self.get_json(f"/v1/systems/{system_uid}/energy"))
 
     async def health(self, system_uid: str) -> dict[str, Any]:
         return _object(await self.get_json(f"/v1/systems/{system_uid}/health"))
@@ -142,8 +157,57 @@ class MorningstarAPIClient:
             },
         )
 
+    async def controller(self, controller_uid: str) -> dict[str, Any]:
+        return _object(await self.get_json(f"/v1/controllers/{controller_uid}"))
+
     async def controller_latest(self, controller_uid: str) -> dict[str, Any]:
         return _object(await self.get_json(f"/v1/controllers/{controller_uid}/latest"))
+
+    async def controller_samples(self, controller_uid: str, *, limit: int = 100) -> JSON:
+        return await self.get_json(f"/v1/controllers/{controller_uid}/samples", limit=limit)
+
+    async def controller_history_summary(self, controller_uid: str) -> dict[str, Any]:
+        return _object(await self.get_json(f"/v1/controllers/{controller_uid}/history/summary"))
+
+    async def controller_polling_performance(
+        self,
+        controller_uid: str,
+        *,
+        mode: str = "all",
+    ) -> dict[str, Any]:
+        return _object(
+            await self.get_json(
+                f"/v1/controllers/{controller_uid}/polling/performance",
+                mode=mode,
+            )
+        )
+
+    async def controller_polling_history(
+        self,
+        controller_uid: str,
+        *,
+        mode: str = "all",
+        limit: int = 100,
+    ) -> JSON:
+        return await self.get_json(
+            f"/v1/controllers/{controller_uid}/polling/history",
+            mode=mode,
+            limit=limit,
+        )
+
+    async def controller_incidents(
+        self,
+        controller_uid: str,
+        *,
+        state: str | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        payload = await self.get_json(
+            f"/v1/controllers/{controller_uid}/incidents",
+            state=state,
+            limit=limit,
+        )
+        return payload if isinstance(payload, list) else list(payload.get("incidents", []))
 
     async def controller_health_score(self, controller_uid: str) -> dict[str, Any]:
         return _object(await self.get_json(f"/v1/controllers/{controller_uid}/health-score"))
@@ -154,8 +218,81 @@ class MorningstarAPIClient:
     async def controller_charge_forecast(self, controller_uid: str) -> dict[str, Any]:
         return _object(await self.get_json(f"/v1/controllers/{controller_uid}/charge-forecast"))
 
-    async def controller_gaps(self, controller_uid: str) -> JSON:
-        return await self.get_json(f"/v1/controllers/{controller_uid}/history/gaps")
+    async def controller_coverage(
+        self,
+        controller_uid: str,
+        *,
+        start: str | None = None,
+        end: str | None = None,
+    ) -> dict[str, Any]:
+        return _object(
+            await self.get_json(
+                f"/v1/controllers/{controller_uid}/history/coverage",
+                **{"from": start, "to": end},
+            )
+        )
+
+    async def controller_gaps(
+        self,
+        controller_uid: str,
+        *,
+        start: str | None = None,
+        end: str | None = None,
+    ) -> JSON:
+        return await self.get_json(
+            f"/v1/controllers/{controller_uid}/history/gaps",
+            **{"from": start, "to": end},
+        )
+
+    async def controller_retained_summary(
+        self,
+        controller_uid: str,
+        *,
+        start: str | None = None,
+        end: str | None = None,
+    ) -> dict[str, Any]:
+        return _object(
+            await self.get_json(
+                f"/v1/controllers/{controller_uid}/history/controller-daily/summary",
+                **{"from": start, "to": end},
+            )
+        )
+
+    async def controller_energy_daily(
+        self,
+        controller_uid: str,
+        *,
+        start: str | None = None,
+        end: str | None = None,
+        max_gap_seconds: int = 300,
+    ) -> JSON:
+        return await self.get_json(
+            f"/v1/controllers/{controller_uid}/energy/daily",
+            **{
+                "from": start,
+                "to": end,
+                "max_gap_seconds": max_gap_seconds,
+            },
+        )
+
+    async def controller_energy_summary(
+        self,
+        controller_uid: str,
+        *,
+        start: str | None = None,
+        end: str | None = None,
+        max_gap_seconds: int = 300,
+    ) -> dict[str, Any]:
+        return _object(
+            await self.get_json(
+                f"/v1/controllers/{controller_uid}/energy/summary",
+                **{
+                    "from": start,
+                    "to": end,
+                    "max_gap_seconds": max_gap_seconds,
+                },
+            )
+        )
 
     @asynccontextmanager
     async def stream_system(self, system_uid: str) -> AsyncIterator[AsyncIterator[SSEEvent]]:
